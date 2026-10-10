@@ -7,6 +7,7 @@ import android.content.Intent;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.SystemClock;
 import android.view.InputDevice;
@@ -16,6 +17,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.webkit.CookieManager;
+import android.webkit.GeolocationPermissions;
 import android.webkit.RenderProcessGoneDetail;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
@@ -23,6 +25,8 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
+
+import java.util.Locale;
 
 public class MainActivity extends Activity {
 
@@ -45,7 +49,10 @@ public class MainActivity extends Activity {
     private CursorView cursor;
     private float cursorX, cursorY;
     private boolean cursorInit;
+    private static final int REPEAT_CAP = 20;
+    private static final float REPEAT_SCALE = 4.0f;
     private long tapDownTime;
+    private long lastEdgeScroll;
     private final Runnable hideCursor = () -> {
         if (cursor != null) {
             cursor.setCursorVisible(false);
@@ -53,7 +60,15 @@ public class MainActivity extends Activity {
     };
 
     static int stepForRepeat(int repeat) {
-        return (int) (BASE_STEP * (1 + Math.min(Math.max(repeat, 0), 20) / 4.0f));
+        return (int) (BASE_STEP * (1 + Math.min(Math.max(repeat, 0), REPEAT_CAP) / REPEAT_SCALE));
+    }
+
+    static boolean isAllowedHost(String host) {
+        if (host == null) {
+            return false;
+        }
+        String h = host.toLowerCase(Locale.ROOT);
+        return h.equals(ALLOWED_HOST) || h.endsWith("." + ALLOWED_HOST);
     }
 
     static float clamp(float value, float min, float max) {
@@ -111,7 +126,9 @@ public class MainActivity extends Activity {
         s.setAllowFileAccessFromFileURLs(false);
         s.setAllowUniversalAccessFromFileURLs(false);
         s.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
-        s.setSafeBrowsingEnabled(true);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            s.setSafeBrowsingEnabled(true);
+        }
 
         CookieManager cookies = CookieManager.getInstance();
         cookies.setAcceptCookie(true);
@@ -132,18 +149,14 @@ public class MainActivity extends Activity {
 
             private boolean handleUrl(Uri uri) {
                 String scheme = uri.getScheme();
-                String host = uri.getHost();
                 boolean http = "http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme);
-                if (http && host != null
-                        && (host.equals(ALLOWED_HOST) || host.endsWith("." + ALLOWED_HOST))) {
+                if (http && isAllowedHost(uri.getHost())) {
                     return false;
                 }
-                if (http && host != null) {
-                    try {
-                        startActivity(new Intent(Intent.ACTION_VIEW, uri));
-                    } catch (ActivityNotFoundException e) {
-                        // No browser on TV, stay in app.
-                    }
+                try {
+                    startActivity(new Intent(Intent.ACTION_VIEW, uri));
+                } catch (ActivityNotFoundException e) {
+                    // No browser on TV, stay in app.
                 }
                 return true;
             }
@@ -152,6 +165,14 @@ public class MainActivity extends Activity {
             public boolean onRenderProcessGone(WebView view, RenderProcessGoneDetail detail) {
                 setupWebView();
                 setContentView(web);
+                if (cursor != null) {
+                    if (cursor.getParent() == null) {
+                        addContentView(cursor, new FrameLayout.LayoutParams(
+                                ViewGroup.LayoutParams.MATCH_PARENT,
+                                ViewGroup.LayoutParams.MATCH_PARENT));
+                    }
+                    cursor.bringToFront();
+                }
                 web.requestFocus();
                 web.loadUrl(HOME);
                 return true;
@@ -161,6 +182,7 @@ public class MainActivity extends Activity {
         chrome = new WebChromeClient() {
             @Override
             public void onShowCustomView(View view, CustomViewCallback callback) {
+                cancelPendingTouch();
                 if (customView != null) {
                     callback.onCustomViewHidden();
                     return;
@@ -175,7 +197,14 @@ public class MainActivity extends Activity {
             }
 
             @Override
+            public void onGeolocationPermissionsShowPrompt(String origin,
+                    GeolocationPermissions.Callback callback) {
+                callback.invoke(origin, false, false);
+            }
+
+            @Override
             public void onHideCustomView() {
+                cancelPendingTouch();
                 if (customView == null) {
                     return;
                 }
@@ -258,16 +287,31 @@ public class MainActivity extends Activity {
         cursorX = nx;
         cursorY = ny;
         cursor.setPos(nx, ny);
-        if (edge && repeat > 1 && customView == null && web != null) {
+        long now = SystemClock.uptimeMillis();
+        if (edge && repeat > 1 && customView == null && web != null
+                && now - lastEdgeScroll >= 16) {
+            lastEdgeScroll = now;
             web.scrollBy(dx * EDGE_SCROLL_PX, dy * EDGE_SCROLL_PX);
         } else {
-            long now = SystemClock.uptimeMillis();
             MotionEvent ev = MotionEvent.obtain(now, now,
                     MotionEvent.ACTION_HOVER_MOVE, nx, ny, 0);
             ev.setSource(InputDevice.SOURCE_MOUSE);
             touchTarget().dispatchGenericMotionEvent(ev);
             ev.recycle();
         }
+    }
+
+    private void cancelPendingTouch() {
+        if (tapDownTime == 0) {
+            return;
+        }
+        long now = SystemClock.uptimeMillis();
+        MotionEvent ev = MotionEvent.obtain(tapDownTime, now,
+                MotionEvent.ACTION_CANCEL, cursorX, cursorY, 0);
+        ev.setSource(InputDevice.SOURCE_TOUCHSCREEN);
+        touchTarget().dispatchTouchEvent(ev);
+        ev.recycle();
+        tapDownTime = 0;
     }
 
     private void tapDown() {

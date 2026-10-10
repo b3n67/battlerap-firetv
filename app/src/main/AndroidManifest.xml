@@ -9,6 +9,7 @@
 
     <application
         android:allowBackup="false"
+        android:usesCleartextTraffic="false"
         android:label="Battlerap"
         android:icon="@drawable/app_icon"
         android:banner="@drawable/app_banner"
