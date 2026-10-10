@@ -24,19 +24,7 @@ mit Abo bzw. gekauftem Event benötigt.
 4. Bei der Nachfrage „Apps unbekannter Herkunft" mit **Zulassen** bestätigen.
 5. Fertig — die App liegt danach in **Meine Apps und Sender**.
 
-## Methode B: vom PC per ADB
-
-1. Am PC: [Android platform-tools](https://developer.android.com/tools/releases/platform-tools)
-   herunterladen und entpacken.
-2. FireTV-IP herausfinden: **Einstellungen → Mein Fire TV → Info → Netzwerk**.
-3. Am PC im platform-tools-Ordner:
-   ```
-   adb connect IP-DES-FIRETV:5555
-   adb install Battlerap-FireTV.apk
-   ```
-4. Am TV erscheinende ADB-Bestätigung **zulassen** (Haken bei „immer vertrauen").
-
-## Methode C: per Smartphone übertragen
+## Methode B: per Smartphone übertragen
 
 Beide Geräte müssen im selben WLAN sein.
 
@@ -54,6 +42,18 @@ Beide Geräte müssen im selben WLAN sein.
 2. App **Apps2Fire** aus dem Play Store installieren und das FireTV per IP
    hinzufügen (IP steht unter Einstellungen → Mein Fire TV → Info → Netzwerk).
 3. In Apps2Fire die APK wählen und per Upload-Symbol aufs FireTV schieben.
+
+## Methode C: vom PC per ADB
+
+1. Am PC: [Android platform-tools](https://developer.android.com/tools/releases/platform-tools)
+   herunterladen und entpacken.
+2. FireTV-IP herausfinden: **Einstellungen → Mein Fire TV → Info → Netzwerk**.
+3. Am PC im platform-tools-Ordner:
+   ```
+   adb connect IP-DES-FIRETV:5555
+   adb install Battlerap-FireTV.apk
+   ```
+4. Am TV erscheinende ADB-Bestätigung **zulassen** (Haken bei „immer vertrauen").
 
 ## Erster Start
 
