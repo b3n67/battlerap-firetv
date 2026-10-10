@@ -4,3 +4,4 @@ build/
 app/build/
 .idea/
 *.iml
+*.apk

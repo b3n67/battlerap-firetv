@@ -8,6 +8,7 @@
     <uses-feature android:name="android.hardware.microphone" android:required="false" />
 
     <application
+        android:allowBackup="false"
         android:label="Battlerap"
         android:icon="@drawable/app_icon"
         android:banner="@drawable/app_banner"

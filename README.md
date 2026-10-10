@@ -4,8 +4,7 @@ Inoffizielle Fan-App (kein offizielles DLTLLY-Release). Zeigt Battles und Livest
 von battlerap.de auf FireTV Cube / FireTV Stick. Es wird ein battlerap.de-Account
 mit Abo bzw. gekauftem Event benötigt.
 
-**Download (v1.0):** `https://tinyurl.com/22lr9q6g`
-(Vollständiger Link: `https://github.com/b3n67/battlerap-firetv/releases/download/v1.0/Battlerap-FireTV.apk`)
+**Download (v1.1):** `https://github.com/b3n67/battlerap-firetv/releases/download/v1.1/Battlerap-FireTV.apk`
 
 ## Vorbereitung (einmalig)
 
@@ -19,7 +18,7 @@ mit Abo bzw. gekauftem Event benötigt.
 ## Methode A: ohne PC (empfohlen)
 
 1. App **Downloader** aus dem Amazon Appstore installieren und öffnen.
-2. Oben den Kurz-Link eintragen: `https://tinyurl.com/22lr9q6g`
+2. Oben den Download-Link eintragen: `https://github.com/b3n67/battlerap-firetv/releases/download/v1.1/Battlerap-FireTV.apk`
 3. Download abwarten und auf **Installieren** tippen.
 4. Bei der Nachfrage „Apps unbekannter Herkunft" mit **Zulassen** bestätigen.
 5. Fertig — die App liegt danach in **Meine Apps und Sender**.
@@ -68,7 +67,15 @@ Beide Geräte müssen im selben WLAN sein.
 
 ## Selbst bauen
 
-Android SDK + Java 17 genügen, kein installiertes Gradle nötig (siehe
-`settings.gradle` / `app/build.gradle`). Bauen z. B. mit portablem Gradle:
-`gradle assembleDebug` — die APK landet unter
-`app/build/outputs/apk/debug/app-debug.apk`.
+`./gradlew assembleDebug` (Windows: `gradlew.bat`) genügt — der Wrapper lädt
+Gradle selbst. APK landet unter `app/build/outputs/apk/debug/`,
+Unit-Tests via `./gradlew testDebugUnitTest`.
+
+Release (signiert): Keystore unter `%USERPROFILE%\.keystore\battlerap-firetv.jks`,
+Passwörter in `%USERPROFILE%\.gradle\gradle.properties`
+(`battlerapStorePassword`, `battlerapKeyPassword`), dann
+`./gradlew assembleRelease`. Prüfen: `aapt2 dump badging` (kein `debuggable`),
+`apksigner verify`, `Get-FileHash -Algorithm SHA256` (SHA-256 gehört ins Release).
+
+Manuelle Prüfung: D-Pad + Repeat-Beschleunigung, OK-Klick, Fullscreen Enter/Exit,
+Zurück (Fullscreen → Verlauf → Ende), Prozess-Tod/Netzverlust.

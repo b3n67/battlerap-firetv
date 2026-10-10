@@ -1,9 +1,12 @@
 package de.battlerap.tvapp;
 
 import android.app.Activity;
+import android.content.ActivityNotFoundException;
 import android.content.Context;
+import android.content.Intent;
 import android.graphics.Canvas;
 import android.graphics.Paint;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.SystemClock;
 import android.view.InputDevice;
@@ -13,7 +16,9 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.webkit.CookieManager;
+import android.webkit.RenderProcessGoneDetail;
 import android.webkit.WebChromeClient;
+import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -22,8 +27,16 @@ import android.widget.FrameLayout;
 public class MainActivity extends Activity {
 
     private static final String HOME = "https://www.battlerap.de/browse";
+    private static final String ALLOWED_HOST = "battlerap.de";
     private static final int BASE_STEP = 24;
+    private static final int EDGE_SCROLL_PX = 80;
     private static final long CURSOR_HIDE_MS = 4000;
+    private static final int CURSOR_RING_RADIUS = 26;
+    private static final int CURSOR_DOT_RADIUS = 6;
+    private static final int CURSOR_RING_WIDTH = 5;
+    private static final int CURSOR_RING_COLOR = 0xFFE60039;
+    private static final int CURSOR_DOT_COLOR = 0xFFFFFFFF;
+    private static final int CURSOR_DIRTY = 32;
 
     private WebView web;
     private WebChromeClient chrome;
@@ -39,11 +52,50 @@ public class MainActivity extends Activity {
         }
     };
 
+    static int stepForRepeat(int repeat) {
+        return (int) (BASE_STEP * (1 + Math.min(Math.max(repeat, 0), 20) / 4.0f));
+    }
+
+    static float clamp(float value, float min, float max) {
+        return Math.max(min, Math.min(max, value));
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        setupWebView();
+        setContentView(web);
+        cursor = new CursorView(this);
+        addContentView(cursor, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT));
+        cursor.setCursorVisible(false);
+        web.requestFocus();
+        if (savedInstanceState == null) {
+            web.loadUrl(HOME);
+        } else {
+            web.restoreState(savedInstanceState);
+            if (web.copyBackForwardList().getSize() == 0) {
+                web.loadUrl(HOME);
+            }
+        }
+    }
 
+    private void setupWebView() {
+        if (customView != null) {
+            if (customView.getParent() != null) {
+                ((ViewGroup) customView.getParent()).removeView(customView);
+            }
+            customView = null;
+            customCallback = null;
+        }
+        if (web != null) {
+            if (web.getParent() != null) {
+                ((ViewGroup) web.getParent()).removeView(web);
+            }
+            web.destroy();
+        }
         web = new WebView(this);
         web.setFocusable(true);
         web.setFocusableInTouchMode(true);
@@ -54,12 +106,57 @@ public class MainActivity extends Activity {
         s.setMediaPlaybackRequiresUserGesture(false);
         s.setLoadWithOverviewMode(true);
         s.setUseWideViewPort(true);
+        s.setAllowFileAccess(false);
+        s.setAllowContentAccess(false);
+        s.setAllowFileAccessFromFileURLs(false);
+        s.setAllowUniversalAccessFromFileURLs(false);
+        s.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
+        s.setSafeBrowsingEnabled(true);
 
         CookieManager cookies = CookieManager.getInstance();
         cookies.setAcceptCookie(true);
+        // Third-party cookies stay on: the video CDN sets them during playback.
         cookies.setAcceptThirdPartyCookies(web, true);
 
-        web.setWebViewClient(new WebViewClient());
+        web.setWebViewClient(new WebViewClient() {
+            @Override
+            public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                return handleUrl(request.getUrl());
+            }
+
+            @Override
+            @SuppressWarnings("deprecation")
+            public boolean shouldOverrideUrlLoading(WebView view, String url) {
+                return handleUrl(Uri.parse(url));
+            }
+
+            private boolean handleUrl(Uri uri) {
+                String scheme = uri.getScheme();
+                String host = uri.getHost();
+                boolean http = "http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme);
+                if (http && host != null
+                        && (host.equals(ALLOWED_HOST) || host.endsWith("." + ALLOWED_HOST))) {
+                    return false;
+                }
+                if (http && host != null) {
+                    try {
+                        startActivity(new Intent(Intent.ACTION_VIEW, uri));
+                    } catch (ActivityNotFoundException e) {
+                        // No browser on TV, stay in app.
+                    }
+                }
+                return true;
+            }
+
+            @Override
+            public boolean onRenderProcessGone(WebView view, RenderProcessGoneDetail detail) {
+                setupWebView();
+                setContentView(web);
+                web.requestFocus();
+                web.loadUrl(HOME);
+                return true;
+            }
+        });
 
         chrome = new WebChromeClient() {
             @Override
@@ -73,7 +170,7 @@ public class MainActivity extends Activity {
                 addContentView(view, new FrameLayout.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT,
                         ViewGroup.LayoutParams.MATCH_PARENT));
-                web.setVisibility(View.INVISIBLE); // kein GONE: sonst verliert das Fullscreen-Video seine Zielgroesse
+                web.setVisibility(View.INVISIBLE); // never GONE: fullscreen video loses its target size
                 cursor.bringToFront();
             }
 
@@ -91,22 +188,6 @@ public class MainActivity extends Activity {
             }
         };
         web.setWebChromeClient(chrome);
-
-        setContentView(web);
-
-        cursor = new CursorView(this);
-        addContentView(cursor, new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT));
-        cursor.setCursorVisible(false);
-
-        web.requestFocus();
-
-        if (savedInstanceState == null) {
-            web.loadUrl(HOME);
-        } else {
-            web.restoreState(savedInstanceState);
-        }
     }
 
     @Override
@@ -134,7 +215,7 @@ public class MainActivity extends Activity {
         } else {
             return super.dispatchKeyEvent(e);
         }
-        if (e.getAction() == KeyEvent.ACTION_DOWN || e.getAction() == KeyEvent.ACTION_MULTIPLE) {
+        if (e.getAction() == KeyEvent.ACTION_DOWN) {
             moveCursor(dx, dy, Math.max(e.getRepeatCount(), 0));
         }
         return true;
@@ -163,37 +244,27 @@ public class MainActivity extends Activity {
     private void moveCursor(int dx, int dy, int repeat) {
         ensureCursorInit();
         showCursor();
-        int step = BASE_STEP * (1 + Math.min(repeat, 20) / 4);
-        float nx = cursorX + dx * step;
-        float ny = cursorY + dy * step;
+        int step = stepForRepeat(repeat);
+        float rawX = cursorX + dx * step;
+        float rawY = cursorY + dy * step;
+        float nx = rawX, ny = rawY;
         boolean edge = false;
         int w = cursor.getWidth(), h = cursor.getHeight();
         if (w > 0 && h > 0) {
-            if (nx < 0) {
-                nx = 0;
-                edge = true;
-            } else if (nx > w) {
-                nx = w;
-                edge = true;
-            }
-            if (ny < 0) {
-                ny = 0;
-                edge = true;
-            } else if (ny > h) {
-                ny = h;
-                edge = true;
-            }
+            nx = clamp(rawX, 0, w);
+            ny = clamp(rawY, 0, h);
+            edge = nx != rawX || ny != rawY;
         }
         cursorX = nx;
         cursorY = ny;
         cursor.setPos(nx, ny);
-        if (edge && repeat > 1 && customView == null) {
-            web.scrollBy(dx * 80, dy * 80);
+        if (edge && repeat > 1 && customView == null && web != null) {
+            web.scrollBy(dx * EDGE_SCROLL_PX, dy * EDGE_SCROLL_PX);
         } else {
             long now = SystemClock.uptimeMillis();
             MotionEvent ev = MotionEvent.obtain(now, now,
                     MotionEvent.ACTION_HOVER_MOVE, nx, ny, 0);
-            ev.setSource(InputDevice.SOURCE_CLASS_POINTER);
+            ev.setSource(InputDevice.SOURCE_MOUSE);
             touchTarget().dispatchGenericMotionEvent(ev);
             ev.recycle();
         }
@@ -203,23 +274,29 @@ public class MainActivity extends Activity {
         tapDownTime = SystemClock.uptimeMillis();
         MotionEvent ev = MotionEvent.obtain(tapDownTime, tapDownTime,
                 MotionEvent.ACTION_DOWN, cursorX, cursorY, 0);
+        ev.setSource(InputDevice.SOURCE_TOUCHSCREEN);
         touchTarget().dispatchTouchEvent(ev);
         ev.recycle();
     }
 
     private void tapUp() {
+        if (tapDownTime == 0) {
+            return;
+        }
         long now = SystemClock.uptimeMillis();
         MotionEvent ev = MotionEvent.obtain(tapDownTime, now,
                 MotionEvent.ACTION_UP, cursorX, cursorY, 0);
+        ev.setSource(InputDevice.SOURCE_TOUCHSCREEN);
         touchTarget().dispatchTouchEvent(ev);
         ev.recycle();
+        tapDownTime = 0;
     }
 
     @Override
     public void onBackPressed() {
         if (customView != null) {
             chrome.onHideCustomView();
-        } else if (web.canGoBack()) {
+        } else if (web != null && web.canGoBack()) {
             web.goBack();
         } else {
             super.onBackPressed();
@@ -229,29 +306,44 @@ public class MainActivity extends Activity {
     @Override
     protected void onSaveInstanceState(Bundle outState) {
         super.onSaveInstanceState(outState);
-        web.saveState(outState);
+        if (web != null) {
+            web.saveState(outState);
+        }
     }
 
     @Override
     protected void onPause() {
         super.onPause();
-        web.onPause();
+        if (cursor != null) {
+            cursor.removeCallbacks(hideCursor);
+        }
+        if (web != null) {
+            web.onPause();
+            web.pauseTimers();
+        }
         CookieManager.getInstance().flush();
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        web.onResume();
+        if (web != null) {
+            web.onResume();
+            web.resumeTimers();
+        }
     }
 
     @Override
     protected void onDestroy() {
+        if (cursor != null) {
+            cursor.removeCallbacks(hideCursor);
+        }
         if (web != null) {
             if (web.getParent() != null) {
                 ((ViewGroup) web.getParent()).removeView(web);
             }
             web.destroy();
+            web = null;
         }
         super.onDestroy();
     }
@@ -266,21 +358,25 @@ public class MainActivity extends Activity {
             super(c);
             setFocusable(false);
             setClickable(false);
+            setVisibility(View.GONE);
             ring.setStyle(Paint.Style.STROKE);
-            ring.setStrokeWidth(5);
-            ring.setColor(0xFFE60039);
+            ring.setStrokeWidth(CURSOR_RING_WIDTH);
+            ring.setColor(CURSOR_RING_COLOR);
             dot.setStyle(Paint.Style.FILL);
-            dot.setColor(0xFFFFFFFF);
+            dot.setColor(CURSOR_DOT_COLOR);
         }
 
         void setPos(float x, float y) {
+            float ox = this.x, oy = this.y;
             this.x = x;
             this.y = y;
-            invalidate();
+            invalidate((int) Math.min(ox, x) - CURSOR_DIRTY, (int) Math.min(oy, y) - CURSOR_DIRTY,
+                    (int) Math.max(ox, x) + CURSOR_DIRTY, (int) Math.max(oy, y) + CURSOR_DIRTY);
         }
 
         void setCursorVisible(boolean v) {
             visible = v;
+            setVisibility(v ? View.VISIBLE : View.GONE);
             invalidate();
         }
 
@@ -289,8 +385,8 @@ public class MainActivity extends Activity {
             if (!visible) {
                 return;
             }
-            canvas.drawCircle(x, y, 26, ring);
-            canvas.drawCircle(x, y, 6, dot);
+            canvas.drawCircle(x, y, CURSOR_RING_RADIUS, ring);
+            canvas.drawCircle(x, y, CURSOR_DOT_RADIUS, dot);
         }
     }
 }
