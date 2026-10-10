@@ -4,8 +4,8 @@ Inoffizielle Fan-App (kein offizielles DLTLLY-Release). Zeigt Battles und Livest
 von battlerap.de auf FireTV Cube / FireTV Stick. Es wird ein battlerap.de-Account
 mit Abo bzw. gekauftem Event benötigt.
 
-**Download (v1.0):**
-`https://github.com/b3n67/battlerap-firetv/releases/download/v1.0/Battlerap-FireTV.apk`
+**Download (v1.0):** `https://tinyurl.com/22lr9q6g`
+(Vollständiger Link: `https://github.com/b3n67/battlerap-firetv/releases/download/v1.0/Battlerap-FireTV.apk`)
 
 ## Vorbereitung (einmalig)
 
@@ -19,8 +19,7 @@ mit Abo bzw. gekauftem Event benötigt.
 ## Methode A: ohne PC (empfohlen)
 
 1. App **Downloader** aus dem Amazon Appstore installieren und öffnen.
-2. Oben den Download-Link eintragen:
-   `https://github.com/b3n67/battlerap-firetv/releases/download/v1.0/Battlerap-FireTV.apk`
+2. Oben den Kurz-Link eintragen: `https://tinyurl.com/22lr9q6g`
 3. Download abwarten und auf **Installieren** tippen.
 4. Bei der Nachfrage „Apps unbekannter Herkunft" mit **Zulassen** bestätigen.
 5. Fertig — die App liegt danach in **Meine Apps und Sender**.
@@ -36,6 +35,25 @@ mit Abo bzw. gekauftem Event benötigt.
    adb install Battlerap-FireTV.apk
    ```
 4. Am TV erscheinende ADB-Bestätigung **zulassen** (Haken bei „immer vertrauen").
+
+## Methode C: per Smartphone übertragen
+
+Beide Geräte müssen im selben WLAN sein.
+
+**Variante 1 – Send Files to TV (Android + iPhone):**
+1. App „Send Files to TV" auf dem FireTV (Amazon Appstore) und auf dem
+   Smartphone (Play Store / App Store) installieren.
+2. Am FireTV in der App auf **Receive**, am Smartphone auf **Send** tippen.
+3. Am Smartphone die **Battlerap-FireTV.apk** wählen (vorher z. B. per Browser
+   über den Kurz-Link oben herunterladen) und senden.
+4. Nach Empfang am FireTV auf **Installieren** tippen (ggf. „Apps unbekannter
+   Herkunft" zulassen).
+
+**Variante 2 – Apps2Fire (nur Android, keine TV-App nötig):**
+1. Am FireTV **ADB-Debugging** einschalten (siehe Vorbereitung).
+2. App **Apps2Fire** aus dem Play Store installieren und das FireTV per IP
+   hinzufügen (IP steht unter Einstellungen → Mein Fire TV → Info → Netzwerk).
+3. In Apps2Fire die APK wählen und per Upload-Symbol aufs FireTV schieben.
 
 ## Erster Start
 
