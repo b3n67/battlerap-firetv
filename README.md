@@ -4,9 +4,8 @@ Inoffizielle Fan-App (kein offizielles DLTLLY-Release). Zeigt Battles und Livest
 von battlerap.de auf FireTV Cube / FireTV Stick. Es wird ein battlerap.de-Account
 mit Abo bzw. gekauftem Event benötigt.
 
-**Download (v1.2):** `https://github.com/b3n67/battlerap-firetv/releases/download/v1.2/Battlerap-FireTV.apk`
-(Kurz-Link für Downloader: `https://tinyurl.com/2ydcsrl5`,
-SHA-256 siehe `SHA256SUMS.txt` im Release)
+**Download (v1.3):** `https://github.com/b3n67/battlerap-firetv/releases/download/v1.3/Battlerap-FireTV.apk`
+(SHA-256 siehe `SHA256SUMS.txt` im Release)
 
 ## Vorbereitung (einmalig)
 
@@ -20,7 +19,7 @@ SHA-256 siehe `SHA256SUMS.txt` im Release)
 ## Methode A: ohne PC (empfohlen)
 
 1. App **Downloader** aus dem Amazon Appstore installieren und öffnen.
-2. Oben den Kurz-Link eintragen: `https://tinyurl.com/2ydcsrl5`
+2. Oben den Download-Link eintragen: `https://github.com/b3n67/battlerap-firetv/releases/download/v1.3/Battlerap-FireTV.apk`
 3. Download abwarten und auf **Installieren** tippen.
 4. Bei der Nachfrage „Apps unbekannter Herkunft" mit **Zulassen** bestätigen.
 5. Fertig — die App liegt danach in **Meine Apps und Sender**.

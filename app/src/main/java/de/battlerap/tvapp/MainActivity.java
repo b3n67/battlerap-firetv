@@ -32,6 +32,8 @@ public class MainActivity extends Activity {
 
     private static final String HOME = "https://www.battlerap.de/browse";
     private static final String ALLOWED_HOST = "battlerap.de";
+    private static final int REPEAT_CAP = 20;
+    private static final float REPEAT_SCALE = 4.0f;
     private static final int BASE_STEP = 24;
     private static final int EDGE_SCROLL_PX = 80;
     private static final long CURSOR_HIDE_MS = 4000;
@@ -49,8 +51,6 @@ public class MainActivity extends Activity {
     private CursorView cursor;
     private float cursorX, cursorY;
     private boolean cursorInit;
-    private static final int REPEAT_CAP = 20;
-    private static final float REPEAT_SCALE = 4.0f;
     private long tapDownTime;
     private long lastEdgeScroll;
     private final Runnable hideCursor = () -> {
@@ -152,6 +152,11 @@ public class MainActivity extends Activity {
                 boolean http = "http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme);
                 if (http && isAllowedHost(uri.getHost())) {
                     return false;
+                }
+                boolean external = http || "mailto".equalsIgnoreCase(scheme)
+                        || "tel".equalsIgnoreCase(scheme) || "sms".equalsIgnoreCase(scheme);
+                if (!external) {
+                    return true;
                 }
                 try {
                     startActivity(new Intent(Intent.ACTION_VIEW, uri));
@@ -360,6 +365,7 @@ public class MainActivity extends Activity {
         super.onPause();
         if (cursor != null) {
             cursor.removeCallbacks(hideCursor);
+            cursor.setCursorVisible(false);
         }
         if (web != null) {
             web.onPause();
