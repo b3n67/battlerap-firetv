@@ -4,12 +4,14 @@ import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.SystemClock;
+import android.view.Gravity;
 import android.view.InputDevice;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
@@ -20,11 +22,14 @@ import android.webkit.CookieManager;
 import android.webkit.GeolocationPermissions;
 import android.webkit.RenderProcessGoneDetail;
 import android.webkit.WebChromeClient;
+import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
+import android.widget.TextView;
+import android.widget.Toast;
 
 import java.util.Locale;
 
@@ -43,6 +48,7 @@ public class MainActivity extends Activity {
     private static final int CURSOR_RING_COLOR = 0xFFE60039;
     private static final int CURSOR_DOT_COLOR = 0xFFFFFFFF;
     private static final int CURSOR_DIRTY = 32;
+    private static final int ERROR_TEXT_SP = 28;
 
     private WebView web;
     private WebChromeClient chrome;
@@ -53,6 +59,10 @@ public class MainActivity extends Activity {
     private boolean cursorInit;
     private long tapDownTime;
     private long lastEdgeScroll;
+    private int rendererDeaths;
+    private long lastRendererDeath;
+    private View errorView;
+    private View downTarget;
     private final Runnable hideCursor = () -> {
         if (cursor != null) {
             cursor.setCursorVisible(false);
@@ -138,20 +148,26 @@ public class MainActivity extends Activity {
         web.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
-                return handleUrl(request.getUrl());
+                return handleUrl(view, request.getUrl());
             }
 
             @Override
             @SuppressWarnings("deprecation")
             public boolean shouldOverrideUrlLoading(WebView view, String url) {
-                return handleUrl(Uri.parse(url));
+                return handleUrl(view, Uri.parse(url));
             }
 
-            private boolean handleUrl(Uri uri) {
+            private boolean handleUrl(WebView view, Uri uri) {
                 String scheme = uri.getScheme();
                 boolean http = "http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme);
-                if (http && isAllowedHost(uri.getHost())) {
-                    return false;
+                if (isAllowedHost(uri.getHost())) {
+                    if ("https".equalsIgnoreCase(scheme)) {
+                        return false;
+                    }
+                    if ("http".equalsIgnoreCase(scheme)) {
+                        view.loadUrl(uri.buildUpon().scheme("https").build().toString());
+                    }
+                    return true;
                 }
                 boolean external = http || "mailto".equalsIgnoreCase(scheme)
                         || "tel".equalsIgnoreCase(scheme) || "sms".equalsIgnoreCase(scheme);
@@ -168,6 +184,8 @@ public class MainActivity extends Activity {
 
             @Override
             public boolean onRenderProcessGone(WebView view, RenderProcessGoneDetail detail) {
+                boolean crash = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
+                        && detail.didCrash();
                 setupWebView();
                 setContentView(web);
                 if (cursor != null) {
@@ -179,8 +197,41 @@ public class MainActivity extends Activity {
                     cursor.bringToFront();
                 }
                 web.requestFocus();
+                long now = SystemClock.uptimeMillis();
+                if (now - lastRendererDeath > 30_000) {
+                    rendererDeaths = 0;
+                }
+                lastRendererDeath = now;
+                if (!crash && ++rendererDeaths > 2) {
+                    Toast.makeText(MainActivity.this,
+                            "Nicht genug Speicher - App bitte neu starten.",
+                            Toast.LENGTH_LONG).show();
+                    return true;
+                }
                 web.loadUrl(HOME);
                 return true;
+            }
+
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                rendererDeaths = 0;
+            }
+
+            @Override
+            public void onReceivedError(WebView view, WebResourceRequest request,
+                    WebResourceError error) {
+                if (request.isForMainFrame()) {
+                    showError();
+                }
+            }
+
+            @Override
+            @SuppressWarnings("deprecation")
+            public void onReceivedError(WebView view, int errorCode, String description,
+                    String failingUrl) {
+                if (web != null && failingUrl != null && failingUrl.equals(web.getUrl())) {
+                    showError();
+                }
             }
         });
 
@@ -231,18 +282,31 @@ public class MainActivity extends Activity {
             if (e.getAction() == KeyEvent.ACTION_DOWN && e.getRepeatCount() == 0) {
                 ensureCursorInit();
                 showCursor();
+                if (isErrorVisible()) {
+                    hideError();
+                    if (web != null) {
+                        web.reload();
+                    }
+                    return true;
+                }
                 tapDown();
             } else if (e.getAction() == KeyEvent.ACTION_UP) {
                 tapUp();
             }
             return true;
         }
+        if (code == KeyEvent.KEYCODE_DPAD_LEFT || code == KeyEvent.KEYCODE_DPAD_RIGHT) {
+            if (customView == null && web != null && web.onCheckIsTextEditor()) {
+                return super.dispatchKeyEvent(e);
+            }
+            if (e.getAction() == KeyEvent.ACTION_DOWN) {
+                moveCursor(code == KeyEvent.KEYCODE_DPAD_LEFT ? -1 : 1, 0,
+                        Math.max(e.getRepeatCount(), 0));
+            }
+            return true;
+        }
         int dx = 0, dy = 0;
-        if (code == KeyEvent.KEYCODE_DPAD_LEFT) {
-            dx = -1;
-        } else if (code == KeyEvent.KEYCODE_DPAD_RIGHT) {
-            dx = 1;
-        } else if (code == KeyEvent.KEYCODE_DPAD_UP) {
+        if (code == KeyEvent.KEYCODE_DPAD_UP) {
             dy = -1;
         } else if (code == KeyEvent.KEYCODE_DPAD_DOWN) {
             dy = 1;
@@ -257,6 +321,40 @@ public class MainActivity extends Activity {
 
     private View touchTarget() {
         return customView != null ? customView : web;
+    }
+
+    private void showError() {
+        if (errorView != null || web == null) {
+            return;
+        }
+        TextView text = new TextView(this);
+        text.setText("Keine Verbindung.\nOK = erneut laden, Zurueck = zurueck");
+        text.setTextSize(ERROR_TEXT_SP);
+        text.setGravity(Gravity.CENTER);
+        FrameLayout box = new FrameLayout(this);
+        box.setBackgroundColor(0xDD000000);
+        box.addView(text, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT));
+        errorView = box;
+        addContentView(box, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT));
+        cursor.bringToFront();
+    }
+
+    private void hideError() {
+        if (errorView == null) {
+            return;
+        }
+        if (errorView.getParent() != null) {
+            ((ViewGroup) errorView.getParent()).removeView(errorView);
+        }
+        errorView = null;
+    }
+
+    private boolean isErrorVisible() {
+        return errorView != null;
     }
 
     private void ensureCursorInit() {
@@ -310,21 +408,32 @@ public class MainActivity extends Activity {
         if (tapDownTime == 0) {
             return;
         }
+        View target = downTarget != null ? downTarget : touchTarget();
+        long downTime = tapDownTime;
+        downTarget = null;
+        tapDownTime = 0;
+        if (target == null) {
+            return;
+        }
         long now = SystemClock.uptimeMillis();
-        MotionEvent ev = MotionEvent.obtain(tapDownTime, now,
+        MotionEvent ev = MotionEvent.obtain(downTime, now,
                 MotionEvent.ACTION_CANCEL, cursorX, cursorY, 0);
         ev.setSource(InputDevice.SOURCE_TOUCHSCREEN);
-        touchTarget().dispatchTouchEvent(ev);
+        target.dispatchTouchEvent(ev);
         ev.recycle();
-        tapDownTime = 0;
     }
 
     private void tapDown() {
         tapDownTime = SystemClock.uptimeMillis();
+        downTarget = touchTarget();
+        if (downTarget == null) {
+            tapDownTime = 0;
+            return;
+        }
         MotionEvent ev = MotionEvent.obtain(tapDownTime, tapDownTime,
                 MotionEvent.ACTION_DOWN, cursorX, cursorY, 0);
         ev.setSource(InputDevice.SOURCE_TOUCHSCREEN);
-        touchTarget().dispatchTouchEvent(ev);
+        downTarget.dispatchTouchEvent(ev);
         ev.recycle();
     }
 
@@ -332,17 +441,30 @@ public class MainActivity extends Activity {
         if (tapDownTime == 0) {
             return;
         }
+        View target = downTarget != null ? downTarget : touchTarget();
+        long downTime = tapDownTime;
+        tapDownTime = 0;
+        downTarget = null;
+        if (target == null) {
+            return;
+        }
         long now = SystemClock.uptimeMillis();
-        MotionEvent ev = MotionEvent.obtain(tapDownTime, now,
+        MotionEvent ev = MotionEvent.obtain(downTime, now,
                 MotionEvent.ACTION_UP, cursorX, cursorY, 0);
         ev.setSource(InputDevice.SOURCE_TOUCHSCREEN);
-        touchTarget().dispatchTouchEvent(ev);
+        target.dispatchTouchEvent(ev);
         ev.recycle();
-        tapDownTime = 0;
     }
 
     @Override
     public void onBackPressed() {
+        if (errorView != null) {
+            hideError();
+            if (web != null) {
+                web.reload();
+            }
+            return;
+        }
         if (customView != null) {
             chrome.onHideCustomView();
         } else if (web != null && web.canGoBack()) {
@@ -363,6 +485,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onPause() {
         super.onPause();
+        cancelPendingTouch();
         if (cursor != null) {
             cursor.removeCallbacks(hideCursor);
             cursor.setCursorVisible(false);
@@ -380,6 +503,14 @@ public class MainActivity extends Activity {
         if (web != null) {
             web.onResume();
             web.resumeTimers();
+        }
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (!hasFocus) {
+            cancelPendingTouch();
         }
     }
 
