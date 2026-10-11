@@ -19,5 +19,4 @@ jobs:
           keytool -genkeypair -keystore ~/.keystore/battlerap-firetv.jks \
             -storepass cipassword -keypass cipassword -alias battlerap -keyalg RSA -keysize 2048 \
             -validity 1 -dname "CN=ci"
-      - run: ./gradlew assembleRelease testDebugUnitTest lintDebug --no-daemon \
-          -PbattlerapStorePassword=cipassword -PbattlerapKeyPassword=cipassword
+      - run: ./gradlew assembleRelease testDebugUnitTest lintDebug --no-daemon -PbattlerapStorePassword=cipassword -PbattlerapKeyPassword=cipassword
