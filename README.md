@@ -4,9 +4,8 @@ Inoffizielle Fan-App (kein offizielles DLTLLY-Release). Zeigt Battles und Livest
 von battlerap.de auf FireTV Cube / FireTV Stick. Es wird ein battlerap.de-Account
 mit Abo bzw. gekauftem Event benötigt.
 
-**Download (v1.4):** `https://github.com/b3n67/battlerap-firetv/releases/download/v1.4/Battlerap-FireTV.apk`
-(Kurz-Link für Downloader: `https://tinyurl.com/2d7e3g5h`,
-SHA-256 siehe `SHA256SUMS.txt` im Release)
+**Download (v1.5):** `https://github.com/b3n67/battlerap-firetv/releases/download/v1.5/Battlerap-FireTV.apk`
+(SHA-256 siehe `SHA256SUMS.txt` im Release)
 
 ## Vorbereitung (einmalig)
 
@@ -20,7 +19,7 @@ SHA-256 siehe `SHA256SUMS.txt` im Release)
 ## Methode A: ohne PC (empfohlen)
 
 1. App **Downloader** aus dem Amazon Appstore installieren und öffnen.
-2. Oben den Kurz-Link eintragen: `https://tinyurl.com/2d7e3g5h`
+2. Oben den Download-Link eintragen: `https://github.com/b3n67/battlerap-firetv/releases/download/v1.5/Battlerap-FireTV.apk`
 3. Download abwarten und auf **Installieren** tippen.
 4. Bei der Nachfrage „Apps unbekannter Herkunft" mit **Zulassen** bestätigen.
 5. Fertig — die App liegt danach in **Meine Apps und Sender**.
@@ -80,4 +79,5 @@ Passwörter in `%USERPROFILE%\.gradle\gradle.properties`
 `apksigner verify`, `Get-FileHash -Algorithm SHA256` (SHA-256 gehört ins Release).
 
 Manuelle Prüfung: D-Pad + Repeat-Beschleunigung, OK-Klick, Fullscreen Enter/Exit,
-Zurück (Fullscreen → Verlauf → Ende), Prozess-Tod/Netzverlust.
+Zurück (Fullscreen → Verlauf → Ende), Prozess-Tod/Netzverlust,
+Textfelder: alle Pfeile wirken im Eingabefeld (Login korrigierbar).

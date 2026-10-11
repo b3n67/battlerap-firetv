@@ -49,6 +49,9 @@ public class MainActivity extends Activity {
     private static final int CURSOR_DOT_COLOR = 0xFFFFFFFF;
     private static final int CURSOR_DIRTY = 32;
     private static final int ERROR_TEXT_SP = 28;
+    private static final String ERROR_OFFLINE =
+            "Keine Verbindung.\nOK = erneut laden, Zurueck = zurueck";
+    private static final String ERROR_RETRY = "OK = erneut laden, Zurueck = zurueck";
 
     private WebView web;
     private WebChromeClient chrome;
@@ -202,10 +205,13 @@ public class MainActivity extends Activity {
                     rendererDeaths = 0;
                 }
                 lastRendererDeath = now;
-                if (!crash && ++rendererDeaths > 2) {
+                rendererDeaths++;
+                if (rendererDeaths > 2) {
                     Toast.makeText(MainActivity.this,
-                            "Nicht genug Speicher - App bitte neu starten.",
+                            crash ? "Wiederholter Absturz - App bitte neu starten."
+                                    : "Nicht genug Speicher - App bitte neu starten.",
                             Toast.LENGTH_LONG).show();
+                    showError(ERROR_RETRY);
                     return true;
                 }
                 web.loadUrl(HOME);
@@ -218,10 +224,24 @@ public class MainActivity extends Activity {
             }
 
             @Override
+            public void onPageStarted(WebView view, String url, Bitmap favicon) {
+                if (url != null) {
+                    Uri u = Uri.parse(url);
+                    if ("http".equalsIgnoreCase(u.getScheme())
+                            && !isAllowedHost(u.getHost())) {
+                        view.stopLoading();
+                        showError(ERROR_OFFLINE);
+                        return;
+                    }
+                }
+                super.onPageStarted(view, url, favicon);
+            }
+
+            @Override
             public void onReceivedError(WebView view, WebResourceRequest request,
                     WebResourceError error) {
                 if (request.isForMainFrame()) {
-                    showError();
+                    showError(ERROR_OFFLINE);
                 }
             }
 
@@ -229,8 +249,12 @@ public class MainActivity extends Activity {
             @SuppressWarnings("deprecation")
             public void onReceivedError(WebView view, int errorCode, String description,
                     String failingUrl) {
-                if (web != null && failingUrl != null && failingUrl.equals(web.getUrl())) {
-                    showError();
+                if (web == null || failingUrl == null) {
+                    return;
+                }
+                String cur = web.getUrl();
+                if (cur == null || failingUrl.equals(cur)) {
+                    showError(ERROR_OFFLINE);
                 }
             }
         });
@@ -295,22 +319,19 @@ public class MainActivity extends Activity {
             }
             return true;
         }
-        if (code == KeyEvent.KEYCODE_DPAD_LEFT || code == KeyEvent.KEYCODE_DPAD_RIGHT) {
-            if (customView == null && web != null && web.onCheckIsTextEditor()) {
-                return super.dispatchKeyEvent(e);
-            }
-            if (e.getAction() == KeyEvent.ACTION_DOWN) {
-                moveCursor(code == KeyEvent.KEYCODE_DPAD_LEFT ? -1 : 1, 0,
-                        Math.max(e.getRepeatCount(), 0));
-            }
-            return true;
-        }
         int dx = 0, dy = 0;
-        if (code == KeyEvent.KEYCODE_DPAD_UP) {
+        if (code == KeyEvent.KEYCODE_DPAD_LEFT) {
+            dx = -1;
+        } else if (code == KeyEvent.KEYCODE_DPAD_RIGHT) {
+            dx = 1;
+        } else if (code == KeyEvent.KEYCODE_DPAD_UP) {
             dy = -1;
         } else if (code == KeyEvent.KEYCODE_DPAD_DOWN) {
             dy = 1;
         } else {
+            return super.dispatchKeyEvent(e);
+        }
+        if (customView == null && web != null && web.onCheckIsTextEditor()) {
             return super.dispatchKeyEvent(e);
         }
         if (e.getAction() == KeyEvent.ACTION_DOWN) {
@@ -323,12 +344,12 @@ public class MainActivity extends Activity {
         return customView != null ? customView : web;
     }
 
-    private void showError() {
+    private void showError(String message) {
         if (errorView != null || web == null) {
             return;
         }
         TextView text = new TextView(this);
-        text.setText("Keine Verbindung.\nOK = erneut laden, Zurueck = zurueck");
+        text.setText(message);
         text.setTextSize(ERROR_TEXT_SP);
         text.setGravity(Gravity.CENTER);
         FrameLayout box = new FrameLayout(this);
