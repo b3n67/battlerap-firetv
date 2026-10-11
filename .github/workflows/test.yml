@@ -13,4 +13,11 @@ jobs:
         run: |
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-34" "build-tools;36.0.0"
-      - run: ./gradlew testDebugUnitTest lintDebug --no-daemon
+      - name: Throwaway keystore
+        run: |
+          mkdir -p ~/.keystore
+          keytool -genkeypair -keystore ~/.keystore/battlerap-firetv.jks \
+            -storepass ci -keypass ci -alias battlerap -keyalg RSA -keysize 2048 \
+            -validity 1 -dname "CN=ci"
+      - run: ./gradlew assembleRelease testDebugUnitTest lintDebug --no-daemon \
+          -PbattlerapStorePassword=ci -PbattlerapKeyPassword=ci
