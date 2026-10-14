@@ -411,6 +411,7 @@ public class MainActivity extends Activity {
         cursorX = nx;
         cursorY = ny;
         cursor.setPos(nx, ny);
+        pokePlayer();
         long now = SystemClock.uptimeMillis();
         if (edge && repeat > 1 && customView == null && web != null
                 && now - lastEdgeScroll >= 16) {
@@ -442,6 +443,16 @@ public class MainActivity extends Activity {
         ev.setSource(InputDevice.SOURCE_TOUCHSCREEN);
         target.dispatchTouchEvent(ev);
         ev.recycle();
+    }
+
+    private void pokePlayer() {
+        if (web == null) {
+            return;
+        }
+        web.evaluateJavascript("(function(){var v=document.querySelector('video');"
+                + "if(v){var r=v.getBoundingClientRect();"
+                + "v.dispatchEvent(new MouseEvent('mousemove',{bubbles:true,"
+                + "clientX:r.left+r.width/2,clientY:r.top+r.height/2}));}})();", null);
     }
 
     private void tapDown() {
